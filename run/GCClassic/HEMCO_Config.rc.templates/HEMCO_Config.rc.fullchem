@@ -163,6 +163,7 @@ Warnings:                    1
     --> RRTMG                  :       ${RUNDIR_USE_RRTMG}    # 2002
     --> SfcVMR                 :       ${RUNDIR_USE_SFCVMR}    # 1750-2014
     --> OCEAN_O3_DRYDEP        :       true     # 1985
+    --> SOIL_PARAMS            :       true     # const.
 # -----------------------------------------------------------------------------
 100     Custom                 : off   -
 101     SeaFlux                : on    DMS/ACET/ALD2/MENO3/ETNO3/MOH
@@ -3386,6 +3387,15 @@ Warnings:                    1
 >>>include ${RUNDIR_MET_FIELD_CONFIG}
 
 )))METEOROLOGY
+
+#==============================================================================
+# --- Soil parameter fields used in ecophysiology module ---
+#==============================================================================
+(((SOIL_PARAMS
+* THETA_WILT     ./HadGEM2ES_Soil_Ancil_05x05.nc     sm_wilt         */1/1/0     C xy  1  * -  1 1
+* THETA_CRIT     ./HadGEM2ES_Soil_Ancil_05x05.nc     sm_crit         */1/1/0     C xy  1  * -  1 1
+* THETA_SATU     ./HadGEM2ES_Soil_Ancil_05x05.nc     sm_sat          */1/1/0     C xy  1  * -  1 1
+)))SOIL_PARAMS
 
 #==============================================================================
 # --- GEOS-Chem restart file ---

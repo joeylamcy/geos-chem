@@ -3367,6 +3367,58 @@ CONTAINS
     Input_Opt%RA_Alt_Above_Sfc = v_int
 
     !------------------------------------------------------------------------
+    ! Turn on ecophysiology?
+    !------------------------------------------------------------------------
+    key    = "operations%dry_deposition%ecophysiology%activate"
+    v_bool = MISSING_BOOL
+    CALL QFYAML_Add_Get( Config, TRIM( key ), v_bool, "", RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error parsing ' // TRIM( key ) // '!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Input_Opt%LECOPHY = v_bool
+
+    !------------------------------------------------------------------------
+    ! CO2 concentration in ppmv for ecophysiology module
+    !------------------------------------------------------------------------
+    key   = "operations%dry_deposition%ecophysiology%O3_damage"
+    v_str = MISSING_STR
+    CALL QFYAML_Add_Get( Config, TRIM( key ), v_str, "", RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error parsing ' // TRIM( key ) // '!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Input_Opt%O3dmg_opt = TRIM( v_str )
+
+    !------------------------------------------------------------------------
+    ! CO2 concentration in ppmv for ecophysiology module
+    !------------------------------------------------------------------------
+    key   = "operations%dry_deposition%ecophysiology%CO2_conc"
+    v_str = MISSING_STR
+    CALL QFYAML_Add_Get( Config, TRIM( key ), v_str, "", RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error parsing ' // TRIM( key ) // '!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Input_Opt%Ecophy_CO2 = Cast_and_RoundOff( v_str, places=2 )
+
+    !------------------------------------------------------------------------
+    ! Turn on photosynthesis-dependent isoprene emission?
+    !------------------------------------------------------------------------
+    key    = "operations%dry_deposition%ecophysiology%online_isop_emis"
+    v_bool = MISSING_BOOL
+    CALL QFYAML_Add_Get( Config, TRIM( key ), v_bool, "", RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error parsing ' // TRIM( key ) // '!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Input_Opt%LIsop_from_Ecophy = v_bool
+
+    !------------------------------------------------------------------------
     ! Turn on wetdep?
     !------------------------------------------------------------------------
     key    = "operations%wet_deposition%activate"
@@ -3401,6 +3453,15 @@ CONTAINS
                            (Input_Opt%CO2_REF   + 80.0_fp)
     ENDIF
 
+    ! Turn off ecophysiology for simulations that don't need it
+    IF ( .NOT. Input_Opt%LDRYD   ) Input_Opt%LECOPHY = .FALSE.
+
+    ! Set options to false if ecophysiology module is turned off.
+    IF ( .NOT. Input_Opt%LECOPHY ) THEN 
+       Input_Opt%O3dmg_opt = 'OFF'
+       Input_Opt%LIsop_from_Ecophy = .FALSE.
+    ENDIF
+
     !========================================================================
     ! Print to screen
     !========================================================================
@@ -3413,6 +3474,10 @@ CONTAINS
        WRITE( 6, 110 ) 'CO2 level                   : ', Input_Opt%CO2_LEVEL
        WRITE( 6, 110 ) 'CO2 reference level         : ', Input_Opt%CO2_REF
        WRITE( 6, 110 ) 'RIX scaling factor          : ', Input_Opt%RS_SCALE
+       WRITE( 6, 100 ) 'Turn on ecophysiology?      : ', Input_Opt%LECOPHY
+       WRITE( 6, 130 ) ' => O3 damage (Sitch)?      : ', Input_Opt%O3dmg_opt
+       WRITE( 6, 110 ) ' => CO2 conc. (ppmv)        : ', Input_Opt%Ecophy_CO2
+       WRITE( 6, 100 ) ' => Online isoprene emis?   : ', Input_Opt%LIsop_from_Ecophy
 
 
        WRITE( 6, 90  ) 'WET DEPOSITION SETTINGS'
@@ -3425,6 +3490,7 @@ CONTAINS
 95  FORMAT( A       )
 100 FORMAT( A, L5   )
 110 FORMAT( A, f8.2 )
+130 FORMAT( A, A  )
 
   END SUBROUTINE Config_DryDep_WetDep
 !!EOC

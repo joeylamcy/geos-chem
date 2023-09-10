@@ -62,6 +62,11 @@ operations:
       CO2_level: 600.0
       reference_CO2_level: 380.0
     diag_alt_above_sfc_in_m: 10
+    ecophysiology:
+      activate: false
+      O3_damage: OFF              # HIGH/LOW/OFF
+      CO2_conc: 390.0
+      online_isop_emis: true
 
   pbl_mixing:
      activate: true

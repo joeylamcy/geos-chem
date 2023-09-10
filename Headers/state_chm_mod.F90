@@ -265,6 +265,13 @@ MODULE State_Chm_Mod
      REAL(fp),          POINTER :: TOMS1      (:,:    )
      REAL(fp),          POINTER :: TOMS2      (:,:    )
 
+     !----------------------------------------------------------------------
+     ! Fields for photosynthesis-dependent isoprene emission 
+     ! (Joey Lam, 22 Oct 2020)
+     !----------------------------------------------------------------------
+     REAL(fp),          POINTER :: Isop_from_Ecophy(:,:) ! Isoprene emission
+                                                         ! [kg m^-2 s^-1]
+
      !-----------------------------------------------------------------------
      ! Fields for UCX (moved from module)
      ! Many of these fields are not sized NX x NY, and thus cannot be allocated
@@ -602,6 +609,10 @@ CONTAINS
     ! Add quantities for coupling to CESM
     State_Chm%H2SO4_PRDR        => NULL()
 #endif
+
+    ! Simulated isoprene emission from ecophysiology module 
+    ! (Joey Lam, 5 Feb 2021)
+    State_Chm%Isop_from_Ecophy  => NULL()
 
   END SUBROUTINE Zero_State_Chm
 !EOC
@@ -2182,6 +2193,25 @@ CONTAINS
     ENDIF
 #endif
 
+    !------------------------------------------------------------------
+    ! Simulated isoprene emission flux from ecophysiology module 
+    ! (Joey Lam, 5 Feb 2021)
+    !------------------------------------------------------------------
+    chmID = 'Isop_from_Ecophy'
+    CALL Init_and_Register(                                                  &
+         Input_Opt  = Input_Opt,                                             &
+         State_Chm  = State_Chm,                                             &
+         State_Grid = State_Grid,                                            &
+         chmId      = chmId,                                                 &
+         Ptr2Data   = State_Chm%Isop_from_Ecophy,                            &
+         RC         = RC                                                    )
+
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = TRIM( errMsg_ir ) // TRIM( chmId )
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+
     !=======================================================================
     ! Initialize State_Chm quantities pertinent to Hg simulations
     !=======================================================================
@@ -3681,6 +3711,12 @@ CONTAINS
        CALL GC_CheckVar( 'State_Chm%NOXLAT', 2, RC )
        IF ( RC /= GC_SUCCESS ) RETURN
        State_Chm%NOXLAT => NULL()
+
+    IF ( ASSOCIATED( State_Chm%Isop_from_Ecophy ) ) THEN
+       DEALLOCATE( State_Chm%Isop_from_Ecophy, STAT=RC )
+       CALL GC_CheckVar( 'State_Chm%Isop_from_Ecophy', 2, RC )
+       IF ( RC /= GC_SUCCESS ) RETURN
+       State_Chm%Isop_from_Ecophy => NULL()
     ENDIF
 
     !-----------------------------------------------------------------------
@@ -4652,6 +4688,11 @@ CONTAINS
           IF ( isUnits ) Units = 'mol mol-1'
           IF ( isRank  ) Rank  = 3
 #endif
+
+       CASE( 'ISOP_FROM_ECOPHY') 
+          IF ( isDesc  ) Desc  = 'Isoprene emission rate'
+          IF ( isUnits ) Units = 'kg m-2 s-1'
+          IF ( isRank  ) Rank  = 2
 
        CASE DEFAULT
           Found = .False.

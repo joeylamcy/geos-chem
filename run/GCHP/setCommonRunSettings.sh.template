@@ -92,6 +92,9 @@ Diag_Collections=(SpeciesConc    \
                   Transport	 \
                   WetLossConv    \
                   WetLossLS      \
+                  DryDepVelPFT   \
+                  Ecophysiology  \
+                  Ecophy_const
 )
 
 #------------------------------------------------------------

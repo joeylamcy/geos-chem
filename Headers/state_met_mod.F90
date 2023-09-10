@@ -245,6 +245,16 @@ MODULE State_Met_Mod
                                                 !  for next month
 
      !----------------------------------------------------------------------
+     ! Soil parameters for ecophysiology (Joey Lam, 26 Feb 2019)
+     !----------------------------------------------------------------------
+     REAL(fp), POINTER :: THETA_CRIT    (:,:  ) ! Soil moisture at critical
+                                                ! point (I,J)
+     REAL(fp), POINTER :: THETA_SATU    (:,:  ) ! Soil moisture at saturation
+                                                ! point (I,J)
+     REAL(fp), POINTER :: THETA_WILT    (:,:  ) ! Soil moisture at wilting
+                                                ! point (I,J)
+
+     !----------------------------------------------------------------------
      ! Fields for querying in which vertical regime a grid box is in
      ! or if a grid box is near local noon solar time
      !----------------------------------------------------------------------
@@ -451,6 +461,9 @@ CONTAINS
     State_Met%SPHU1          => NULL()
     State_Met%SPHU2          => NULL()
     State_Met%T              => NULL()
+    State_Met%THETA_CRIT     => NULL()
+    State_Met%THETA_SATU     => NULL()
+    State_Met%THETA_WILT     => NULL()
     State_Met%TAUCLI         => NULL()
     State_Met%TAUCLW         => NULL()
     State_Met%TMPU1          => NULL()
@@ -1748,6 +1761,60 @@ CONTAINS
          State_Grid = State_Grid,                                            &
          metId      = metId,                                                 &
          Ptr2Data   = State_Met%SWGDN,                                       &
+         RC         = RC                                                    )
+
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = TRIM( errMsg_ir ) // TRIM( metId )
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+
+    !------------------------------------------------------------------------
+    ! THETA_CRIT [1]
+    !------------------------------------------------------------------------
+    metId = 'THETA_CRIT'
+    CALL Init_and_Register(                                                  &
+         Input_Opt  = Input_Opt,                                             &
+         State_Met  = State_Met,                                             &
+         State_Grid = State_Grid,                                            &
+         metId      = metId,                                                 &
+         Ptr2Data   = State_Met%THETA_CRIT,                                  &
+         RC         = RC                                                    )
+
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = TRIM( errMsg_ir ) // TRIM( metId )
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+
+    !------------------------------------------------------------------------
+    ! THETA_SATU [1]
+    !------------------------------------------------------------------------
+    metId = 'THETA_SATU'
+    CALL Init_and_Register(                                                  &
+         Input_Opt  = Input_Opt,                                             &
+         State_Met  = State_Met,                                             &
+         State_Grid = State_Grid,                                            &
+         metId      = metId,                                                 &
+         Ptr2Data   = State_Met%THETA_SATU,                                  &
+         RC         = RC                                                    )
+
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = TRIM( errMsg_ir ) // TRIM( metId )
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+
+    !------------------------------------------------------------------------
+    ! THETA_WILT [1]
+    !------------------------------------------------------------------------
+    metId = 'THETA_WILT'
+    CALL Init_and_Register(                                                  &
+         Input_Opt  = Input_Opt,                                             &
+         State_Met  = State_Met,                                             &
+         State_Grid = State_Grid,                                            &
+         metId      = metId,                                                 &
+         Ptr2Data   = State_Met%THETA_WILT,                                  &
          RC         = RC                                                    )
 
     IF ( RC /= GC_SUCCESS ) THEN
@@ -3690,6 +3757,27 @@ CONTAINS
        State_Met%SWGDN => NULL()
     ENDIF
 
+    IF ( ASSOCIATED( State_Met%THETA_CRIT ) ) THEN
+      DEALLOCATE( State_Met%THETA_CRIT, STAT=RC )
+      CALL GC_CheckVar( 'State_Met%THETA_CRIT', 2, RC )
+      IF ( RC /= GC_SUCCESS ) RETURN
+      State_Met%THETA_CRIT => NULL()
+    ENDIF
+
+    IF ( ASSOCIATED( State_Met%THETA_SATU ) ) THEN
+      DEALLOCATE( State_Met%THETA_SATU, STAT=RC )
+      CALL GC_CheckVar( 'State_Met%THETA_SATU', 2, RC )
+      IF ( RC /= GC_SUCCESS ) RETURN
+      State_Met%THETA_SATU => NULL()
+    ENDIF
+
+    IF ( ASSOCIATED( State_Met%THETA_WILT ) ) THEN
+      DEALLOCATE( State_Met%THETA_WILT, STAT=RC )
+      CALL GC_CheckVar( 'State_Met%THETA_WILT', 2, RC )
+      IF ( RC /= GC_SUCCESS ) RETURN
+      State_Met%THETA_WILT => NULL()
+    ENDIF
+
     IF ( ASSOCIATED( State_Met%TropLev ) ) THEN
        DEALLOCATE( State_Met%TropLev, STAT=RC  )
        CALL GC_CheckVar( 'State_Met%TropLev', 2, RC )
@@ -5279,6 +5367,24 @@ CONTAINS
 !          IF ( isDesc  ) Desc  = 'Is each grid box in the planetary boundary layer?'
 !          IF ( isUnits ) Units = 'boolean'
 !          IF ( isRank  ) Rank  = 3
+
+       !--------------------------------------------------------------------
+       ! Soil moisture 2D fields
+       !--------------------------------------------------------------------
+       CASE ( 'THETA_WILT' )
+          IF ( isDesc  ) Desc  = 'Soil moisture conc. at wilting point'
+          IF ( isUnits ) Units = 'm3 m-3'
+          IF ( isRank  ) Rank  = 2
+
+       CASE ( 'THETA_CRIT' )
+          IF ( isDesc  ) Desc  = 'Soil moisture conc. at critical point'
+          IF ( isUnits ) Units = 'm3 m-3'
+          IF ( isRank  ) Rank  = 2
+
+       CASE ( 'THETA_SATU' )
+          IF ( isDesc  ) Desc  = 'Soil moisture conc. at saturation'
+          IF ( isUnits ) Units = 'm3 m-3'
+          IF ( isRank  ) Rank  = 2
 
        CASE DEFAULT
           Found = .False.
