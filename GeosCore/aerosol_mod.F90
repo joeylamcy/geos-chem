@@ -173,7 +173,6 @@ CONTAINS
 !
 ! !USES:
 !
-    USE CMN_FJX_MOD,      ONLY : REAA
     USE ErrCode_Mod
     USE ERROR_MOD
 #if !defined( MODEL_CESM )
@@ -186,7 +185,7 @@ CONTAINS
     USE State_Diag_Mod,    ONLY : DgnState
     USE State_Grid_Mod,    ONLY : GrdState
     USE State_Met_Mod,     ONLY : MetState
-    USE UnitConv_Mod,      ONLY : Convert_Spc_Units
+    USE UnitConv_Mod
     USE TIME_MOD,          ONLY : GET_MONTH
 #ifdef TOMAS
     USE TOMAS_MOD,        ONLY : IBINS
@@ -229,7 +228,6 @@ CONTAINS
     REAL(fp)            :: REFF
 
     ! Logical flags
-    LOGICAL             :: prtDebug
     LOGICAL             :: LCARB
     LOGICAL             :: LDUST
     LOGICAL             :: LSSALT
@@ -245,6 +243,7 @@ CONTAINS
 
     ! Pointers
     TYPE(SpcConc), POINTER   :: Spc(:)
+    REAL*8,        POINTER   :: REAA(:,:)
     REAL(fp),      POINTER   :: AIRVOL(:,:,:)
     REAL(fp),      POINTER   :: PMID(:,:,:)
     REAL(fp),      POINTER   :: T(:,:,:)
@@ -252,7 +251,8 @@ CONTAINS
     REAL(fp),      POINTER   :: KG_STRAT_AER(:,:,:,:)
 
     ! Other variables
-    CHARACTER(LEN=63)   :: OrigUnit
+    INTEGER             :: OrigUnit
+
 
     ! For spatially and seasonally varying OM/OC
     CHARACTER(LEN=255)  :: FIELDNAME
@@ -278,9 +278,6 @@ CONTAINS
     LSSALT  = Input_Opt%LSSALT
     LSULF   = Input_Opt%LSULF
 
-    ! Do we have to print debug output?
-    prtDebug   = ( Input_Opt%LPRT .and. Input_Opt%amIRoot )
-
     ! Define logical flags
     IS_OCPI    = ( id_OCPI  > 0 )
     IS_OCPO    = ( id_OCPO  > 0 )
@@ -303,9 +300,18 @@ CONTAINS
     Is_SimpleSOA  = ( id_SOAS > 0 )
     Is_ComplexSOA = Input_Opt%LSOA
 
+    ! Set pointers
+    REAA => State_Chm%Phot%REAA
+
     ! Convert species to [kg] for this routine
-    CALL Convert_Spc_Units( Input_Opt, State_Chm, State_Grid, State_Met, &
-                            'kg', RC, OrigUnit=OrigUnit )
+    CALL Convert_Spc_Units(                                                  &
+         Input_Opt  = Input_Opt,                                             &
+         State_Chm  = State_Chm,                                             &
+         State_Grid = State_Grid,                                            &
+         State_Met  = State_Met,                                             &
+         outUnit    = KG_SPECIES,                                            &
+         origUnit   = origUnit,                                              &
+         RC         = RC                                                    )
 
     ! Trap potential errors
     IF ( RC /= GC_SUCCESS ) THEN
@@ -417,7 +423,7 @@ CONTAINS
                             ( Rho_wet / Rho_dry ) )
 
        ! Print values to log file
-       IF ( Input_Opt%amIRoot ) THEN
+       IF ( Input_Opt%Verbose ) THEN
           WRITE( 6,'(a)') 'Growth factors at 35% RH:'
           WRITE( 6, 100 ) SIA_GROWTH, ' for SO4, NIT, and NH4'
           WRITE( 6, 100 ) ORG_GROWTH, ' for OCPI and SOA'
@@ -1012,8 +1018,14 @@ CONTAINS
     !$OMP END PARALLEL DO
 
     ! Convert species back to original unit
-    CALL Convert_Spc_Units( Input_Opt, State_Chm, State_Grid, State_Met, &
-                            OrigUnit, RC )
+    CALL Convert_Spc_Units(                                                  &
+         Input_Opt  = Input_Opt,                                             &
+         State_Chm  = State_Chm,                                             &
+         State_Grid = State_Grid,                                            &
+         State_Met  = State_Met,                                             &
+         outUnit    = origUnit,                                              &
+         RC         = RC                                                    )
+
     IF ( RC /= GC_SUCCESS ) THEN
        CALL GC_Error('Unit conversion error', RC, &
                      'End of AEROSOL_CONC in aerosol_mod.F90')
@@ -1022,6 +1034,7 @@ CONTAINS
 
     ! Free pointers
     Spc      => NULL()
+    REAA     => NULL()
     AIRVOL   => NULL()
     PMID     => NULL()
     T        => NULL()
@@ -1050,8 +1063,7 @@ CONTAINS
 !
 ! !USES:
 !
-    USE CMN_SIZE_Mod,   ONLY : NRH, NRHAER, NSTRATAER
-    USE CMN_FJX_MOD
+    USE CMN_SIZE_Mod,   ONLY : NAER, NRH, NDUST, NRHAER, NSTRATAER
     USE ErrCode_Mod
     USE ERROR_MOD,      ONLY : ERROR_STOP, Safe_Div
     USE Input_Opt_Mod,  ONLY : OptInput
@@ -1180,14 +1192,33 @@ CONTAINS
     REAL(fp)            :: GF_RH
     REAL(fp)            :: BCAE_1, BCAE_2
 
-    ! Pointers
-    REAL(fp), POINTER   :: BXHEIGHT(:,:,:)
-    REAL(fp), POINTER   :: ERADIUS(:,:,:,:)
-    REAL(fp), POINTER   :: TAREA(:,:,:,:)
-    REAL(fp), POINTER   :: WERADIUS(:,:,:,:)
-    REAL(fp), POINTER   :: WTAREA(:,:,:,:)
+    ! Pointers to State_Chm%Phot
+    INTEGER,  POINTER   :: IWVREQUIRED(:)
+    INTEGER,  POINTER   :: IWVSELECT  (:,:)
+    INTEGER,  POINTER   :: IRHARR     (:,:,:)
+    REAL*8,   POINTER   :: ACOEF_WV (:)
+    REAL*8,   POINTER   :: BCOEF_WV (:)
+    REAL*8,   POINTER   :: REAA     (:,:)
+    REAL*8,   POINTER   :: QQAA     (:,:,:)
+    REAL*8,   POINTER   :: ALPHAA   (:,:,:)
+    REAL*8,   POINTER   :: SSAA     (:,:,:)
+    REAL*8,   POINTER   :: ASYMAA   (:,:,:)
+    REAL*8,   POINTER   :: ISOPOD   (:,:,:,:)
+    REAL*8,   POINTER   :: ODAER    (:,:,:,:,:)
+#ifdef RRTMG
+    REAL*8,   POINTER   :: RTODAER  (:,:,:,:,:)
+    REAL*8,   POINTER   :: RTSSAER  (:,:,:,:,:)
+    REAL*8,   POINTER   :: RTASYMAER(:,:,:,:,:)
+#endif
+
+    ! Other pointers
+    REAL(fp), POINTER   :: BXHEIGHT (:,:,:)
+    REAL(fp), POINTER   :: ERADIUS  (:,:,:,:)
+    REAL(fp), POINTER   :: TAREA    (:,:,:,:)
+    REAL(fp), POINTER   :: WERADIUS (:,:,:,:)
+    REAL(fp), POINTER   :: WTAREA   (:,:,:,:)
     REAL(fp), POINTER   :: ACLRADIUS(:,:,:)
-    REAL(fp), POINTER   :: ACLAREA(:,:,:)
+    REAL(fp), POINTER   :: ACLAREA  (:,:,:)
 
     ! For diagnostics
     LOGICAL                :: IsWL1
@@ -1226,13 +1257,30 @@ CONTAINS
     IS_POA               = ( id_POA1 > 0 .AND. id_POA2 > 0 )
 
     ! Initialize pointers
-    BXHEIGHT            => State_Met%BXHEIGHT    ! Grid box height [m]
-    ERADIUS             => State_Chm%AeroRadi    ! Aerosol Radius [cm]
-    TAREA               => State_Chm%AeroArea    ! Aerosol Area [cm2/cm3]
-    WERADIUS            => State_Chm%WetAeroRadi ! Wet Aerosol Radius [cm]
-    WTAREA              => State_Chm%WetAeroArea ! Wet Aerosol Area [cm2/cm3]
-    ACLRADIUS           => State_Chm%AClRadi     ! Fine Cl- Radius [cm]
-    ACLAREA             => State_Chm%AClArea     ! Fine Cl- Area [cm2/cm3]
+    IWVREQUIRED => State_Chm%Phot%IWVREQUIRED ! WL indexes for interpolation
+    IWVSELECT   => State_Chm%Phot%IWVSELECT   ! Indexes of requested WLs
+    IRHARR      => State_Chm%Phot%IRHARR      ! Relative humidity indexes
+    ACOEF_WV    => State_Chm%Phot%ACOEF_WV    ! Coeffs for WL interpolation
+    BCOEF_WV    => State_Chm%Phot%BCOEF_WV    ! Coeffs for WL interpolation
+    REAA        => State_Chm%Phot%REAA
+    QQAA        => State_Chm%Phot%QQAA
+    ALPHAA      => State_Chm%Phot%ALPHAA
+    SSAA        => State_Chm%Phot%SSAA
+    ASYMAA      => State_Chm%Phot%ASYMAA
+    ISOPOD      => State_Chm%Phot%ISOPOD      ! Isoprene optical depth
+    ODAER       => State_Chm%Phot%ODAER       ! Aerosol optical depth
+#ifdef RRTMG
+    RTODAER     => State_Chm%Phot%RTODAER     ! Optical dust
+    RTSSAER     => State_Chm%Phot%RTSSAER
+    RTASYMAER   => State_Chm%Phot%RTASYMAER
+#endif
+    BXHEIGHT    => State_Met%BXHEIGHT    ! Grid box height [m]
+    ERADIUS     => State_Chm%AeroRadi    ! Aerosol Radius [cm]
+    TAREA       => State_Chm%AeroArea    ! Aerosol Area [cm2/cm3]
+    WERADIUS    => State_Chm%WetAeroRadi ! Wet Aerosol Radius [cm]
+    WTAREA      => State_Chm%WetAeroArea ! Wet Aerosol Area [cm2/cm3]
+    ACLRADIUS   => State_Chm%AClRadi     ! Fine Cl- Radius [cm]
+    ACLAREA     => State_Chm%AClArea     ! Fine Cl- Area [cm2/cm3]
 
     ! Initialize the mapping between hygroscopic species in the
     ! species database and the species order in NRHAER
@@ -1288,7 +1336,7 @@ CONTAINS
        ! Use online aerosol concentrations
        !-----------------------------------
        IF ( FIRST ) THEN
-          IF ( Input_Opt%amIRoot ) WRITE( 6, 100 )
+          IF ( Input_Opt%amIRoot .and. Input_Opt%Verbose ) WRITE( 6, 100 )
 100       FORMAT( '     - RDAER: Using online SO4 NH4 NIT!' )
        ENDIF
 
@@ -1326,7 +1374,7 @@ CONTAINS
        ! Use online aerosol concentrations
        !-----------------------------------
        IF ( FIRST ) THEN
-          IF ( Input_Opt%amIRoot ) WRITE( 6, 110 )
+          IF ( Input_Opt%amIRoot .and. Input_Opt%Verbose ) WRITE( 6, 110 )
 110       FORMAT( '     - RDAER: Using online BCPI OCPI BCPO OCPO!' )
        ENDIF
 
@@ -1377,8 +1425,10 @@ CONTAINS
        ! Use online aerosol concentrations
        !-----------------------------------
        IF ( FIRST ) THEN
-          IF ( Input_Opt%amIRoot ) WRITE( 6, 120 )
-120       FORMAT( '     - RDAER: Using online SALA SALC' )
+          IF ( Input_Opt%amIRoot .and. Input_Opt%Verbose ) THEN
+             WRITE( 6, 120 )
+120          FORMAT( '     - RDAER: Using online SALA SALC' )
+          ENDIF
        ENDIF
 
        !$OMP PARALLEL DO       &
@@ -1462,12 +1512,13 @@ CONTAINS
        IF ( LRAD ) THEN
           !Loop over all RT wavelengths (30)
           ! plus any required for calculating the AOD
-          NWVS = NWVAA-NWVAA0+NWVREQUIRED
+          NWVS = State_Chm%Phot%NWVAA - State_Chm%Phot%NWVAA0 + &
+                 State_Chm%Phot%NWVREQUIRED
        ELSE
           !Loop over wavelengths needed for
           !interpolation to those requested in geoschem_config.yml
           !(determined in RD_AOD)
-          NWVS = NWVREQUIRED
+          NWVS = State_Chm%Phot%NWVREQUIRED
        ENDIF
     ENDIF
 
@@ -1476,16 +1527,16 @@ CONTAINS
        IF (ODSWITCH .EQ. 0) THEN
           ! only doing for 1000nm (IWV1000 is set in RD_AOD)
           ! N.B. NWVS is fixed to 1 above - only one wavelength
-          IWV=IWV1000
+          IWV=State_Chm%Phot%IWV1000
        ELSE
           IF ( LRAD ) THEN
              ! RRTMG wavelengths begin after NWVAA0 standard wavelengths
              ! but add on any others required
              IF (IIWV.LE.30) THEN
                 !index of RRTMG wavelengths starts after the standard NWVAA0
-                !(currently NWVAA0=11, set in CMN_FJX_mod based on the
-                ! .dat LUT)
-                IWV = IIWV+NWVAA0
+                !(currently NWVAA0=11, hard-coded in phot_container_mod based
+                ! on the .dat LUT)
+                IWV = IIWV + State_Chm%Phot%NWVAA0
              ELSE
                 !now we calculate at wvs for the requested AOD
                 IWV = IWVREQUIRED(IIWV-30)
@@ -2242,7 +2293,30 @@ CONTAINS
     !TAREA(:,NDUST+NRHAER+2) = 0.d0 !SPA
 
     ! Free pointers
-    NULLIFY( BXHEIGHT, ERADIUS, TAREA, WERADIUS, WTAREA, ACLRADIUS, ACLAREA )
+    IWVREQUIRED => NULL()
+    IWVSELECT   => NULL()
+    IRHARR      => NULL()
+    ACOEF_WV    => NULL()
+    BCOEF_WV    => NULL()
+    REAA        => NULL()
+    QQAA        => NULL()
+    ALPHAA      => NULL()
+    SSAA        => NULL()
+    ASYMAA      => NULL()
+    ISOPOD      => NULL()
+    ODAER       => NULL()
+#ifdef RRTMG
+    RTODAER     => NULL()
+    RTSSAER     => NULL()
+    RTASYMAER   => NULL()
+#endif
+    BXHEIGHT    => NULL()
+    ERADIUS     => NULL()
+    TAREA       => NULL()
+    WERADIUS    => NULL()
+    WTAREA      => NULL()
+    ACLRADIUS   => NULL()
+    ACLAREA     => NULL()
 
     ! Reset first-time flag
     FIRST = .FALSE.
@@ -2582,7 +2656,7 @@ CONTAINS
     USE State_Grid_Mod, ONLY : GrdState
     USE State_Met_Mod,  ONLY : MetState
     USE PhysConstants,  ONLY : MwCarb
-    USE UnitConv_Mod,   ONLY : Convert_Spc_Units
+    USE UnitConv_Mod
 !
 ! !INPUT PARAMETERS:
 !
@@ -2618,7 +2692,7 @@ CONTAINS
     INTEGER                  :: I, J, L
 
     ! Strings
-    CHARACTER(LEN=63)        :: OrigUnit
+    INTEGER                  :: origUnit
     CHARACTER(LEN=255)       :: ThisLoc
     CHARACTER(LEN=512)       :: ErrMsg
 
@@ -2650,13 +2724,14 @@ CONTAINS
 
     ! Initialize
     RC       = GC_SUCCESS
-    ErrMsg   = ''
-    ThisLoc  = ' -> at Set_AerMass_Diagnostic (in module GeosCore/aerosol_mod.F90)'
+    errMsg   = ''
+    thisLoc  = &
+     ' -> at Set_AerMass_Diagnostic (in module GeosCore/aerosol_mod.F90)'
 
     ! Check that species units are kg/kg dry air
-    IF ( TRIM( State_Chm%Spc_Units ) /= 'kg/kg dry' ) THEN
-       CALL GC_Error( 'Incorrect species units: ' // &
-                      State_Chm%Spc_Units, RC, ThisLoc )
+    IF ( State_Chm%Spc_Units /= KG_SPECIES_PER_KG_DRY_AIR ) THEN
+       errMsg = 'Incorrect species units: ' // UNIT_STR( State_Chm%Spc_Units )
+       CALL GC_Error( errMsg, RC, thisLoc )
        RETURN
     ENDIF
 

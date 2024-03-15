@@ -217,7 +217,7 @@ CONTAINS
     USE State_Grid_Mod,       ONLY : GrdState
     USE State_Met_Mod,        ONLY : MetState
     USE TIME_MOD,             ONLY : GET_TS_DYN, GET_TS_CONV, GET_TS_CHEM
-    USE UnitConv_Mod,         ONLY : Convert_Spc_Units
+    USE UnitConv_Mod
 
     use timers_mod
 #ifdef MODEL_CLASSIC
@@ -249,7 +249,7 @@ CONTAINS
 !
     ! Scalars
     INTEGER                 :: I, J, L, L1, L2, N, D, NN, NA, nAdvect, S
-    INTEGER                 :: DRYDEPID
+    INTEGER                 :: DRYDEPID, origUnit
     INTEGER                 :: PBL_TOP, DRYD_TOP, EMIS_TOP
     REAL(fp)                :: TS, TMP, FRQ, RKT, FRAC, FLUX, AREA_M2
     REAL(fp)                :: MWkg, DENOM
@@ -258,7 +258,6 @@ CONTAINS
     LOGICAL                 :: LEMIS,      LDRYD
     LOGICAL                 :: DryDepSpec, EmisSpec
     REAL(f8)                :: DT_Tend
-    CHARACTER(LEN=63)       :: OrigUnit
 
     ! PARANOX loss fluxes (kg/m2/s). These are obtained from the
     ! HEMCO PARANOX extension via the diagnostics module.
@@ -280,13 +279,12 @@ CONTAINS
     REAL(fp),      POINTER  :: DepFreq(:,:,:  )  ! IM, JM, nDryDep
 
     ! Temporary save for total ch4 (Xueying Yu, 12/08/2017)
-    LOGICAL                 :: ITS_A_CH4_SIM
     REAL(fp)                :: total_ch4_pre_soil_absorp(State_Grid%NX, &
                                                          State_Grid%NY, &
                                                          State_Grid%NZ)
 
     ! Strings
-    CHARACTER(LEN=255) :: ErrMsg, ErrorMsg, ThisLoc
+    CHARACTER(LEN=255)      :: ErrMsg, ErrorMsg, ThisLoc
 
 #ifdef ADJOINT
     LOGICAL                 :: IS_ADJ
@@ -310,7 +308,6 @@ CONTAINS
     LEMIS             = Input_Opt%DoEmissions
     LDRYD             = Input_Opt%LDRYD
     PBL_DRYDEP        = Input_Opt%PBL_DRYDEP
-    ITS_A_CH4_SIM     = Input_Opt%ITS_A_CH4_SIM
     nAdvect           = State_Chm%nAdvect
 
     ! Initialize pointer
@@ -364,9 +361,21 @@ CONTAINS
     ! v/v for mixing, hence needed to convert before and after.
     ! Now use units kg/m2 as State_Chm%SPECIES units in DO_TEND to
     ! remove area-dependency (ewl, 9/30/15)
-    CALL Convert_Spc_Units( Input_Opt, State_Chm, State_Grid, State_Met, &
-                            'kg/m2', RC, OrigUnit=OrigUnit )
-
+    CALL Convert_Spc_Units(                                                  &
+         Input_Opt  = Input_Opt,                                             &
+         State_Chm  = State_Chm,                                             &
+         State_Grid = State_Grid,                                            &
+         State_Met  = State_Met,                                             &
+         outUnit    = KG_SPECIES_PER_M2,                                     &
+         origUnit   = origUnit,                                              &
+         RC         = RC                                                    )
+    
+    IF ( RC /= GC_SUCCESS ) THEN
+       ErrMsg = 'Unit conversion error!'
+       CALL GC_Error( ErrMsg, RC, ThisLoc )
+       RETURN
+    ENDIF
+    
 #if defined( ADJOINT )  && defined ( DEBUG )
     IF (Input_Opt%is_adjoint .and. Input_Opt%IS_FD_SPOT_THIS_PET) THEN
        WRITE(*,*) ' SpcAdj(IFD,JFD) after unit converstion: ',  &
@@ -457,7 +466,7 @@ CONTAINS
     ! For tagged CH4 simulations
     ! Save the total CH4 concentration before apply soil absorption
     !-----------------------------------------------------------------------
-    IF ( ITS_A_CH4_SIM .and. Input_Opt%LSPLIT ) THEN
+    IF ( Input_Opt%ITS_A_TAGCH4_SIM ) THEN
        total_ch4_pre_soil_absorp = State_Chm%Species(1)%Conc(:,:,:)
     ENDIF
 
@@ -791,7 +800,7 @@ CONTAINS
              ! Tagged CH4 species are split off into a separate loop to
              ! ensure we remove soil absorption from NA=1 (total CH4) first
              !--------------------------------------------------------------
-             IF ( ITS_A_CH4_SIM .and. Input_Opt%LSPLIT ) THEN
+             IF ( Input_Opt%ITS_A_TAGCH4_SIM ) THEN
 
                 ! If we are in the chemistry grid
                 IF ( L <= EMIS_TOP ) THEN
@@ -866,7 +875,7 @@ CONTAINS
     !--------------------------------------------------------------
     ! Special handling for tagged CH4 simulations
     !--------------------------------------------------------------
-    IF ( ITS_A_CH4_SIM .and. Input_Opt%LSPLIT ) THEN
+    IF ( Input_Opt%ITS_A_TAGCH4_SIM ) THEN
 
        !$OMP PARALLEL DO                         &
        !$OMP DEFAULT( SHARED                   ) &
@@ -936,9 +945,16 @@ CONTAINS
     ENDIF
 
 #endif
+
     ! Convert State_Chm%Species back to original units
-    CALL Convert_Spc_Units( Input_Opt, State_Chm, State_Grid, State_Met, &
-                            OrigUnit, RC )
+    CALL Convert_Spc_Units(                                                  &
+         Input_Opt  = Input_Opt,                                             &
+         State_Chm  = State_Chm,                                             &
+         State_Grid = State_Grid,                                            &
+         State_Met  = State_Met,                                             &
+         outUnit    = origUnit,                                              &
+         RC         = RC                                                    )
+
     IF ( RC /= GC_SUCCESS ) THEN
        ErrMsg = 'Unit conversion error!'
        CALL GC_Error( ErrMsg, RC, ThisLoc )

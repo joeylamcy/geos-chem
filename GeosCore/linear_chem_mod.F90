@@ -166,7 +166,7 @@ CONTAINS
     USE State_Grid_Mod,     ONLY : GrdState
     USE State_Met_Mod,      ONLY : MetState
     USE TIME_MOD,           ONLY : TIMESTAMP_STRING
-    USE UnitConv_Mod,       ONLY : Convert_Spc_Units
+    USE UnitConv_Mod
 
     IMPLICIT NONE
 !
@@ -202,9 +202,8 @@ CONTAINS
     LOGICAL            :: IT_IS_A_TAGO3_SIM
 
     ! Scalars
-    LOGICAL            :: prtDebug
     INTEGER            :: I,     J,       L,   N
-    INTEGER            :: NN
+    INTEGER            :: NN,    origUnit
     REAL(fp)           :: dt,    P,       k,   M0,  RC
     REAL(fp)           :: TK,    RDLOSS,  T1L, mOH, BryTmp
     REAL(fp)           :: BOXVL, Num,     Den, M
@@ -219,7 +218,6 @@ CONTAINS
 
     ! Strings
     CHARACTER(LEN=16)  :: STAMP
-    CHARACTER(LEN=63)  :: OrigUnit
     CHARACTER(LEN=255) :: ThisLoc
     CHARACTER(LEN=512) :: ErrMsg
 
@@ -242,7 +240,6 @@ CONTAINS
     LSYNOZ               = Input_Opt%LSYNOZ
     IT_IS_A_FULLCHEM_SIM = Input_Opt%ITS_A_FULLCHEM_SIM
     IT_IS_A_TAGO3_SIM    = Input_Opt%ITS_A_TAGO3_SIM
-    prtDebug             = ( Input_Opt%LPRT .and. Input_Opt%amIRoot )
     Spc                  => NULL()
     AD                   => NULL()
     T                    => NULL()
@@ -306,7 +303,7 @@ CONTAINS
     ENDIF
 #endif
 
-    IF ( prtDebug ) THEN
+    IF ( Input_Opt%Verbose ) THEN
        CALL DEBUG_MSG( '### LINEAR_CHEM: at DO_LINEAR_CHEM' )
     ENDIF
 
@@ -602,9 +599,16 @@ CONTAINS
        !======================================================================
        IF ( LLINOZ .OR. LSYNOZ ) THEN
 
-          ! Convert units to [v/v dry air] for Linoz and Synoz (ewl, 10/05/15)
-          CALL Convert_Spc_Units( Input_Opt, State_Chm, State_Grid, State_Met, &
-                                  'v/v dry', errCode,   OrigUnit=OrigUnit )
+          ! Convert units to [v/v dry air] aka [mol/mol dry] 
+          ! for Linoz and Synoz (ewl, 10/05/15)
+          CALL Convert_Spc_Units(                                            &
+               Input_Opt  = Input_Opt,                                       &
+               State_Chm  = State_Chm,                                       &
+               State_Grid = State_Grid,                                      &
+               State_Met  = State_Met,                                       &
+               outUnit    = MOLES_SPECIES_PER_MOLES_DRY_AIR,                 &
+               origUnit   = origUnit,                                        &
+               RC         = errCode                                         )
 
           ! Trap potential errors
           IF ( errCode /= GC_SUCCESS ) THEN
@@ -622,9 +626,14 @@ CONTAINS
                             State_Met, errCode )
           ENDIF
 
-         ! Convert species units back to original unit
-         CALL Convert_Spc_Units( Input_Opt, State_Chm, State_Grid, State_Met, &
-                                 OrigUnit,  errCode )
+          ! Convert species units back to original unit
+          CALL Convert_Spc_Units(                                            &
+               Input_Opt  = Input_Opt,                                       &
+               State_Chm  = State_Chm,                                       &
+               State_Grid = State_Grid,                                      &
+               State_Met  = State_Met,                                       &
+               outUnit    = origUnit,                                        &
+               RC         = errCode                                         )
 
           ! Trap potential errors
           IF ( errCode /= GC_SUCCESS ) THEN
@@ -1148,15 +1157,15 @@ CONTAINS
              IF ( TRIM( SpcInfo%Name ) .eq. TRIM(sname) ) THEN
 
                 IF ( LLINOZ .and. TRIM( SpcInfo%Name ) .eq. 'O3' ) THEN
-                   IF ( Input_Opt%amIRoot ) THEN
+                   IF ( Input_Opt%amIRoot .and. Input_Opt%Verbose ) THEN
                       WRITE( 6, '(a)' ) TRIM( SpcInfo%Name ) // ' (via Linoz)'
                    ENDIF
                 ELSE IF ( Input_Opt%LSYNOZ .AND. TRIM( SpcInfo%Name ) .eq. 'O3' ) THEN
-                   IF ( Input_Opt%amIRoot ) THEN
+                   IF ( Input_Opt%amIRoot .and. Input_Opt%Verbose ) THEN
                       WRITE( 6, '(a)' ) TRIM( SpcInfo%Name ) // ' (via Synoz)'
                    ENDIF
                 ELSE
-                   IF ( Input_Opt%amIRoot ) THEN
+                   IF ( Input_Opt%amIRoot .and. Input_Opt%Verbose ) THEN
                       WRITE( 6, '(a)' ) TRIM( SpcInfo%Name )//' (via GMI rates)'
                    ENDIF
                 ENDIF
@@ -1173,7 +1182,7 @@ CONTAINS
 
        ! These are the reactions with which we will use OH fields
        ! to determine loss.
-       IF( Input_Opt%amIRoot ) THEN
+       IF( Input_Opt%amIRoot .and. Input_Opt%Verbose ) THEN
           IF ( id_CHBr3  .gt. 0 ) WRITE(6,*) 'CHBr3 (from GMI OH)'
           IF ( id_CH2Br2 .gt. 0 ) WRITE(6,*) 'CH2Br2 (from GMI OH)'
           IF ( id_CH3Br  .gt. 0 ) WRITE(6,*) 'CH3Br (from GMI OH)'
@@ -1184,11 +1193,11 @@ CONTAINS
     !===========!
     ELSE IF ( IT_IS_A_TAGO3_SIM ) THEN
        IF ( LLINOZ ) THEN
-          IF ( Input_Opt%amIRoot ) THEN
+          IF ( Input_Opt%amIRoot .and. Input_Opt%Verbose ) THEN
              WRITE(6,*) 'Linoz ozone performed on: '
           ENDIF
        ELSE
-          IF ( Input_Opt%amIRoot ) THEN
+          IF ( Input_Opt%amIRoot .and. Input_Opt%Verbose ) THEN
              WRITE(6,*) 'Synoz ozone performed on: '
           ENDIF
        ENDIF

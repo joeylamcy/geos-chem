@@ -27,7 +27,6 @@
 ###############################################################################
 
 ROOT:                        ${RUNDIR_DATA_ROOT}/HEMCO
-METDIR:                      ${RUNDIR_MET_DIR}
 GCAPSCENARIO:                ${RUNDIR_GCAP2_SCENARIO}
 GCAPVERTRES:                 ${RUNDIR_GCAP2_VERTRES}
 Logfile:                     *
@@ -39,8 +38,8 @@ Separator:                   /
 Unit tolerance:              1
 Negative values:             0
 Only unitless scale factors: false
-Verbose:                     0
-Warnings:                    1
+Verbose:                     false
+VerboseOnCores:              root       # Accepted values: root all
 Mask fractions:              false
 
 ### END SECTION SETTINGS ###
@@ -434,9 +433,11 @@ Mask fractions:              false
 >>>include $ROOT/CEDS/v2020-08/HEMCO_Config.CEDS_GBD-MAPS.rc
 )))CEDS_GBDMAPS
 (((CEDS_GBDMAPS_byFuelType
-(((.not.CEDS_GBDMAPS.and..not.CEDSv2
+(((.not.CEDS_GBDMAPS
+(((.not.CEDSv2
 >>>include $ROOT/CEDS/v2020-08/HEMCO_Config.CEDS_GBD-MAPS_byFuelType.rc
-))).not.CEDS_GBDMAPS.and..not.CEDSv2
+))).not.CEDSv2
+))).not.CEDS_GBDMAPS
 )))CEDS_GBDMAPS_byFuelType
 
 #==============================================================================
@@ -804,11 +805,11 @@ Mask fractions:              false
 #==============================================================================
 (((MEGAN
 (((HEMCO_RESTART
-108  T_DAVG                       ./HEMCO_restart.$YYYY$MM$DD$HH00.nc                T_DAVG                  $YYYY/$MM/$DD/$HH EY xy K        * - 1 1
-108  T_PREVDAY                    ./HEMCO_restart.$YYYY$MM$DD$HH00.nc                T_PREVDAY               $YYYY/$MM/$DD/$HH EY xy K        * - 1 1
-108  LAI_PREVDAY                  ./HEMCO_restart.$YYYY$MM$DD$HH00.nc                LAI_PREVDAY             $YYYY/$MM/$DD/$HH EY xy 1        * - 1 1
-108  PARDR_DAVG                   ./HEMCO_restart.$YYYY$MM$DD$HH00.nc                PARDR_DAVG              $YYYY/$MM/$DD/$HH EY xy W/m2     * - 1 1
-108  PARDF_DAVG                   ./HEMCO_restart.$YYYY$MM$DD$HH00.nc                PARDF_DAVG              $YYYY/$MM/$DD/$HH EY xy W/m2     * - 1 1
+108  T_DAVG                       ./Restarts/HEMCO_restart.$YYYY$MM$DD$HH00.nc                T_DAVG                  $YYYY/$MM/$DD/$HH EY xy K        * - 1 1
+108  T_PREVDAY                    ./Restarts/HEMCO_restart.$YYYY$MM$DD$HH00.nc                T_PREVDAY               $YYYY/$MM/$DD/$HH EY xy K        * - 1 1
+108  LAI_PREVDAY                  ./Restarts/HEMCO_restart.$YYYY$MM$DD$HH00.nc                LAI_PREVDAY             $YYYY/$MM/$DD/$HH EY xy 1        * - 1 1
+108  PARDR_DAVG                   ./Restarts/HEMCO_restart.$YYYY$MM$DD$HH00.nc                PARDR_DAVG              $YYYY/$MM/$DD/$HH EY xy W/m2     * - 1 1
+108  PARDF_DAVG                   ./Restarts/HEMCO_restart.$YYYY$MM$DD$HH00.nc                PARDF_DAVG              $YYYY/$MM/$DD/$HH EY xy W/m2     * - 1 1
 )))HEMCO_RESTART
 108  MEGAN_AEF_ISOP               $ROOT/MEGAN/v2018-05/MEGAN2.1_EF.geos.025x03125.nc      AEF_ISOPRENE            1985/1/1/0        C xy kgC/m2/s * 61 1 1
 108  MEGAN_AEF_MBOX               $ROOT/MEGAN/v2018-05/MEGAN2.1_EF.geos.025x03125.nc      AEF_MBO                 1985/1/1/0        C xy kgC/m2/s * 64 1 1

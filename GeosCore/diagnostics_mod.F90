@@ -461,6 +461,7 @@ CONTAINS
     USE State_Diag_Mod, ONLY : DgnMap
     USE State_Diag_Mod, ONLY : DgnState
     USE State_Grid_Mod, ONLY : GrdState
+    USE UnitConv_Mod
 !
 ! !INPUT PARAMETERS:
 !
@@ -509,8 +510,9 @@ CONTAINS
     ThisLoc = ' -> Set_SpcAdj_Diagnostic (in GeosCore/diagnostics_mod.F90)'
 
     ! Verify that incoming State_Chm%Species units are kg/kg dry air.
-    IF ( TRIM( State_Chm%Spc_Units ) /= 'kg/kg dry' ) THEN
-       ErrMsg = 'Incorrect species units in Set_SpcAdj_Diags_VVDry!' // trim( State_Chm%Spc_Units)
+    IF ( State_Chm%Spc_Units /= KG_SPECIES_PER_KG_DRY_AIR ) THEN
+       ErrMsg = 'Incorrect species units in Set_SpcAdj_Diags_VVDry!'    // &
+                 trim( UNIT_STR(State_Chm%Spc_Units) )
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
     ENDIF
@@ -612,6 +614,7 @@ CONTAINS
     USE State_Diag_Mod, ONLY : DgnState
     USE State_Grid_Mod, ONLY : GrdState
     USE Time_Mod,       ONLY : Get_LocalTime
+    USE UnitConv_Mod
 !
 ! !INPUT PARAMETERS:
 !
@@ -663,7 +666,7 @@ CONTAINS
          ' -> at Set_SpcConc_Diags_VVDry (in GeosCore/diagnostics_mod.F90)'
 
     ! Verify that incoming State_Chm%Species units are kg/kg dry air.
-    IF ( TRIM( State_Chm%Spc_Units ) /= 'kg/kg dry' ) THEN
+    IF ( State_Chm%Spc_Units /= KG_SPECIES_PER_KG_DRY_AIR ) THEN
        ErrMsg = 'Incorrect species units in Set_SpcConc_Diags_VVDry!'
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
@@ -871,6 +874,7 @@ CONTAINS
     USE State_Diag_Mod, ONLY : DgnMap
     USE State_Diag_Mod, ONLY : DgnState
     USE State_Grid_Mod, ONLY : GrdState
+    USE UnitConv_Mod
 !
 ! !INPUT PARAMETERS:
 !
@@ -916,7 +920,7 @@ CONTAINS
          ' -> at Set_SpcConc_Diags_MND (in GeosCore/diagnostics_mod.F90)'
 
     ! Verify that incoming State_Chm%Species units are kg/kg dry air.
-    IF ( TRIM( State_Chm%Spc_Units ) /= 'kg/kg dry' ) THEN
+    IF ( State_Chm%Spc_Units /= KG_SPECIES_PER_KG_DRY_AIR ) THEN
        ErrMsg = 'Incorrect species units in Set_SpcConc_Diags_MND!'
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
@@ -982,6 +986,7 @@ CONTAINS
     USE State_Diag_Mod, ONLY : DgnMap
     USE State_Diag_Mod, ONLY : DgnState
     USE State_Grid_Mod, ONLY : GrdState
+    USE UnitConv_Mod
 !
 ! !INPUT PARAMETERS:
 !
@@ -1045,9 +1050,9 @@ CONTAINS
     spcMass = 0.0_f8
 
     ! Exit if concentrations are not in [kg/kg dry]
-    IF ( State_Chm%Spc_Units /= 'kg/kg dry' ) THEN
+    IF ( State_Chm%Spc_Units /= KG_SPECIES_PER_KG_DRY_AIR ) THEN
        errMsg = 'State_Chm%Species units must be kg/kg dry. ' // &
-                'Incorrect units: '// TRIM( State_Chm%Spc_Units )
+                'Incorrect units: '// TRIM( UNIT_STR(State_Chm%Spc_Units ) )
        CALL GC_Error( errMsg, RC, ThisLoc )
        RETURN
     ENDIF
@@ -1374,11 +1379,14 @@ CONTAINS
 
     ! Get the species ID for OH if this is the first call
     IF ( first ) THEN
-       id_OH  = Ind_('OH')
-       IF ( id_OH < 0 ) THEN
-          errMsg = 'OH is not a defined species in this simulation!!!'
-          CALL GC_Error( errMsg, RC, thisLoc )
-          RETURN
+       IF ( Input_Opt%ITS_A_CARBON_SIM     .or.                              &
+            Input_Opt%ITS_A_FULLCHEM_SIM ) THEN
+          id_OH  = Ind_('OH')
+          IF ( id_OH < 0 ) THEN
+             errMsg = 'OH is not a defined species in this simulation!!!'
+             CALL GC_Error( errMsg, RC, thisLoc )
+             RETURN
+          ENDIF
        ENDIF
        first= .FALSE.
     ENDIF

@@ -39,6 +39,7 @@
     USE CMN_DIAG_MOD
     USE DIAG_MOD,           ONLY : AD44
 #endif
+    USE UnitConv_Mod
 
     IMPLICIT NONE
 !
@@ -74,7 +75,6 @@
     INTEGER,  SAVE     :: id_NK1
 
     ! Scalars
-    LOGICAL            :: prtDebug
     INTEGER            :: nDryDep
     INTEGER            :: I,      J,        L
     INTEGER            :: N,      JC,       BIN,   ID
@@ -120,17 +120,14 @@
     nDryDep   = State_Chm%nDryDep
 
     ! Check that species units are in [kg] (ewl, 8/13/15)
-    IF ( TRIM( State_Chm%Spc_Units ) /= 'kg' ) THEN
-       MSG = 'Incorrect species units: ' // TRIM(State_Chm%Spc_Units)
+    IF ( State_Chm%Spc_Units /= KG_SPECIES ) THEN
+       MSG = 'Incorrect species units: ' // TRIM(UNIT_STR(State_Chm%Spc_Units))
        LOC = 'Routine AERO_DRYDEP in aero_drydep.F'
        CALL GC_Error( MSG, RC, LOC )
     ENDIF
 
     ! DTCHEM is the chemistry timestep in seconds
     DTCHEM    = GET_TS_CHEM()
-
-    ! Get logical values from Input_Opt
-    prtDebug  = ( Input_Opt%LPRT .and. Input_Opt%amIRoot )
 
     ! Initialize pointers
     Spc      => State_Chm%Species
@@ -525,7 +522,7 @@
     ENDDO
     !$OMP END PARALLEL DO
 
-    IF ( prtDebug ) PRINT *,'### Finish AERO_DRYDEP'
+    IF ( Input_Opt%Verbose ) PRINT *,'### Finish AERO_DRYDEP'
 
     ! Free pointers
     Spc      => NULL()
@@ -534,9 +531,9 @@
     DepFreq  => NULL()
 
     ! Check that species units are still in [kg] (ewl, 8/13/15)
-    IF ( TRIM( State_Chm%Spc_Units ) /= 'kg' ) THEN
+    IF ( State_Chm%Spc_Units /= KG_SPECIES ) THEN
        MSG = 'Incorrect species units at end of routine: ' &
-             // TRIM(State_Chm%Spc_Units)
+             // TRIM(UNIT_STR(State_Chm%Spc_Units))
        LOC = 'Routine AERO_DRYDEP in aero_drydep.F'
        CALL GC_Error( MSG, RC, LOC )
     ENDIF

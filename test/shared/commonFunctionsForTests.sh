@@ -32,19 +32,15 @@ SED_CONFIG_3='s/end_date: \[20160201, 000000\]/end_date: \[20190101, 010000\]/'
 SED_CONFIG_4='s/end_date: \[20160101, 000000\]/end_date: \[20190101, 010000\]/'
 SED_CONFIG_5='s/end_date: \[20190201, 000000\]/end_date: \[20190101, 010000\]/'
 SED_CONFIG_6='s/end_date: \[20190801, 000000\]/end_date: \[20190701, 010000\]/'
-SED_CONFIG_N='s/end_date: \[20190801, 000000\]/end_date: \[20190701, 002000\]/'
+SED_CONFIG_N1='s/end_date: \[20190201, 000000\]/end_date: \[20190101, 002000\]/'
+SED_CONFIG_N2='s/end_date: \[20190801, 000000\]/end_date: \[20190701, 002000\]/'
 SED_HEMCO_CONF_1='s/GEOS_0.25x0.3125/GEOS_0.25x0.3125_NA/'
 SED_HEMCO_CONF_2='s/GEOS_0.5x0.625/GEOS_0.5x0.625_NA/'
+SED_HEMCO_CONF_3='s/DiagnFreq:                   Monthly/DiagnFreq:                   00000000 010000/'
+SED_HEMCO_CONF_4='s/DiagnFreq:                   Monthly/DiagnFreq:                   00000000 002000/'
 SED_HEMCO_CONF_N='s/\$RES.\$NC/\$RES.NA.\$NC/'
 SED_HISTORY_RC_1='s/00000100 000000/00000000 010000/'
-SED_HISTORY_RC_2='s/7440000/010000/'
 SED_HISTORY_RC_N='s/00000100 000000/00000000 002000/'
-SED_RUN_CONFIG_1='s/20160101 000000/20190101 000000/'
-SED_RUN_CONFIG_2='s/20160201 000000/20190101 010000/'
-SED_RUN_CONFIG_3='s/20190201 000000/20190101 010000/'
-SED_RUN_CONFIG_4='s/00000100 000000/00000000 010000/'
-SED_RUN_CONFIG_5='s/7440000/010000/'
-SED_RUN_CONFIG_6='s/1680000/010000/'
 CMP_PASS_STR='Configure & Build.....PASS'
 CMP_FAIL_STR='Configure & Build.....FAIL'
 EXE_PASS_STR='Execute Simulation....PASS'
@@ -74,10 +70,27 @@ function sed_ie() {
     regex="${1}"
     file="${2}"
     if [[ "x$(uname -s)" == "xDarwin" ]]; then
-	sed -i '' -e "${regex}" "${file}"          # MacOS/Darwin
+        sed -i '' -e "${regex}" "${file}"          # MacOS/Darwin
     else
-	sed -i -e "${regex}" "${file}"             # GNU/Linux
+        sed -i -e "${regex}" "${file}"             # GNU/Linux
     fi
+}
+
+
+function sed_string() {
+    #========================================================================
+    # Returns a sed command string to replace a substring in a line of text.
+    #
+    # 1st argument = String of text
+    # 2nd argument = Substring
+    # 3rd argument = Replacement substring
+    #========================================================================
+    text=${1//\//\\\/}                # Replace '/' with '\/'
+    text=${text//\*/\\\*}             # Replace '*' with '\*'
+    text=${text//\./\\\.}             # Replace '.' with '\.'
+    text=${text//\$/\\\$}             # Replace '$' with '\$'
+    newText=${text/"${2}"/"${3}"}     # Repace substr w/ replacement str
+    echo "s/${text}/${newText}/"  # Create sed command
 }
 
 
@@ -88,9 +101,9 @@ function absolute_path() {
     # 1st argument = relative path
     #========================================================================
     if [[ -d "${1}" ]]; then
-	absPath=$(readlink -f "${1}")   # If directory exists, use readlink
+        absPath=$(readlink -f "${1}")   # If directory exists, use readlink
     else
-	absPath="${1/#\~/$HOME}"        # Otherwise, replace ~ with $HOME
+        absPath="${1/#\~/$HOME}"        # Otherwise, replace ~ with $HOME
     fi
     echo "${absPath}"
 }
@@ -103,11 +116,11 @@ function is_valid_rundir() {
     # 1st argument: File or directory to be tested
     #========================================================================
     if [[ -d "${1}" ]]; then
-	if [[ -f "${1}/geoschem_config.yml" && \
-	      -f "${1}/HEMCO_Config.rc" ]]; then
-	    echo "TRUE"
-	    return
-	fi
+        if [[ -f "${1}/geoschem_config.yml" && \
+          -f "${1}/HEMCO_Config.rc" ]]; then
+            echo "TRUE"
+            return
+        fi
     fi
     echo "FALSE"
 }
@@ -121,10 +134,10 @@ function is_gchp_rundir() {
     #========================================================================
     expr=$(is_valid_rundir "${1}")
     if [[ "x${expr}" == "xTRUE" ]]; then
-	if [[ -f "${1}/CAP.rc" ]]; then
-	    echo "TRUE"
-	    return
-	fi
+        if [[ -f "${1}/CAP.rc" ]]; then
+            echo "TRUE"
+            return
+        fi
     fi
     echo "FALSE"
 }
@@ -143,10 +156,10 @@ function count_rundirs() {
     cd "${rundirsDir}"
     declare -i x=0
     for runDir in *; do
-	expr=$(is_valid_rundir "${runDir}")
-	if [[ "x${expr}" == "xTRUE" ]]; then
-	    let x++
-	fi
+        expr=$(is_valid_rundir "${runDir}")
+        if [[ "x${expr}" == "xTRUE" ]]; then
+            let x++
+        fi
     done
     cd "${thisDir}"
 
@@ -163,23 +176,29 @@ function update_gchp_config_files() {
     # 2nd argument: Integration test root directory
     #========================================================================
     runPath=$(absolute_path "${1}")           # GCHP run dir (abs path)
-    file="${runPath}/setCommonRunSettings.sh" # config file to edit
 
-    # Replace text in config file
-    sed_ie "${SED_RUN_CONFIG_1}"                                    "${file}"
-    sed_ie "${SED_RUN_CONFIG_2}"                                    "${file}"
-    sed_ie "${SED_RUN_CONFIG_3}"                                    "${file}"
-    sed_ie "${SED_RUN_CONFIG_4}"                                    "${file}"
-    sed_ie "${SED_RUN_CONFIG_5}"                                    "${file}"
-    sed_ie "${SED_RUN_CONFIG_6}"                                    "${file}"
+    # Edit config file setCommonRunSettings.sh
+    file="${runPath}/setCommonRunSettings.sh"
+
+    # 24 cores on 1 node
+    sed_ie "s/TOTAL_CORES=.*/TOTAL_CORES=24/"                       "${file}"
+    sed_ie "s/NUM_NODES=.*/NUM_NODES=1/"                            "${file}"
+    sed_ie "s/NUM_CORES_PER_NODE=.*/NUM_CORES_PER_NODE=24/"         "${file}"
+
+    # C24 grid resolution
     sed_ie "s/CS_RES=.*/CS_RES=24/"                                 "${file}"
+
+    # 1-hr duration
+    sed_ie "s/Run_Duration=\".*/Run_Duration=\"00000000 010000\"/"  "${file}"
+
+    # 1-hr diagnostics
     sed_ie "s/AutoUpdate_Diagnostics=.*/AutoUpdate_Diagnostics=ON/" "${file}"
     sed_ie "s/Diag_Monthly=\"1\".*/Diag_Monthly=\"0\"/"             "${file}"
     sed_ie "s/Diag_Frequency=\".*/Diag_Frequency=\"010000\"/"       "${file}"
     sed_ie "s/Diag_Duration=\".*/Diag_Duration=\"010000\"/"         "${file}"
-    sed_ie "s/TOTAL_CORES=.*/TOTAL_CORES=24/"                       "${file}"
-    sed_ie "s/NUM_NODES=.*/NUM_NODES=1/"                            "${file}"
-    sed_ie "s/NUM_CORES_PER_NODE=.*/NUM_CORES_PER_NODE=24/"         "${file}"
+
+    # Do not require species in restart file
+    sed_ie "s/Require_Species_in_Restart=.*/Require_Species_in_Restart=0/" "${file}"
 }
 
 function update_config_files() {
@@ -197,11 +216,9 @@ function update_config_files() {
 
     # For nested-grid fullchem runs, change simulation time to 20 minutes
     # in order to reduce the run time of the whole set of integration tests.
-    if grep -q "025x03125_fullchem" <<< "${runPath}"; then
-	sed_ie "${SED_CONFIG_N}" "${runPath}/geoschem_config.yml"
-    fi
-    if grep -q "05x0625_fullchem" <<< "${runPath}"; then
-	sed_ie "${SED_CONFIG_N}" "${runPath}/geoschem_config.yml"
+    if grep -q "05x0625" <<< "${runPath}"; then
+        sed_ie "${SED_CONFIG_N1}" "${runPath}/geoschem_config.yml"
+        sed_ie "${SED_CONFIG_N2}" "${runPath}/geoschem_config.yml"
     fi
 
     # Other text replacements
@@ -217,11 +234,12 @@ function update_config_files() {
     #------------------------------------------------------------------------
 
     # For all nested-grid rundirs, add a NA into the entries for met fields
-    if grep -q "025x03125" <<< "${runPath}"; then
-	sed_ie "${SED_HEMCO_CONF_N}" "${runPath}/HEMCO_Config.rc"
-    fi
+    # Also update the DiagnFreq for nested or global simulations
     if grep -q "05x0625" <<< "${runPath}"; then
-	sed_ie "${SED_HEMCO_CONF_N}" "${runPath}/HEMCO_Config.rc"
+        sed_ie "${SED_HEMCO_CONF_N}" "${runPath}/HEMCO_Config.rc"
+        sed_ie "${SED_HEMCO_CONF_4}" "${runPath}/HEMCO_Config.rc"
+    else
+        sed_ie "${SED_HEMCO_CONF_3}" "${runPath}/HEMCO_Config.rc"
     fi
 
     # Other text replacements
@@ -233,17 +251,15 @@ function update_config_files() {
     #------------------------------------------------------------------------
 
     if [[ -f "${runPath}/HEMCO_Config.rc.gmao_metfields" ]]; then
-	# For all nested-grid rundirs, add a NA into the entries for met fields
-	if grep -q "025x03125" <<< "${runPath}"; then
-	    sed_ie "${SED_HEMCO_CONF_N}" "${runPath}/HEMCO_Config.rc.gmao_metfields"
-	fi
-	if grep -q "05x0625" <<< "${runPath}"; then
-	    sed_ie "${SED_HEMCO_CONF_N}" "${runPath}/HEMCO_Config.rc.gmao_metfields"
-	fi
+        # For all nested-grid rundirs, add a NA into the entries for met fields
+        if grep -q "05x0625" <<< "${runPath}"; then
+            sed_ie "${SED_HEMCO_CONF_N}" \
+           "${runPath}/HEMCO_Config.rc.gmao_metfields"
+        fi
 
-	# Other text replacements
-	sed_ie "${SED_HEMCO_CONF_1}" "${runPath}/HEMCO_Config.rc.gmao_metfields"
-	sed_ie "${SED_HEMCO_CONF_2}" "${runPath}/HEMCO_Config.rc.gmao_metfields"
+        # Other text replacements
+        sed_ie "${SED_HEMCO_CONF_1}" "${runPath}/HEMCO_Config.rc.gmao_metfields"
+        sed_ie "${SED_HEMCO_CONF_2}" "${runPath}/HEMCO_Config.rc.gmao_metfields"
     fi
 
     #------------------------------------------------------------------------
@@ -252,16 +268,12 @@ function update_config_files() {
 
     # For nested-grid fullchem runs, change frequency and duration to 20 mins
     # in order to reduce the run time of the whole set of integration tests.
-    if grep -q "025x03125_fullchem" <<< "${runPath}"; then
-	sed_ie "${SED_HISTORY_RC_N}" "${runPath}/HISTORY.rc"
-    fi
-    if grep -q "05x0625_fullchem" <<< "${runPath}"; then
-	sed_ie "${SED_HISTORY_RC_N}" "${runPath}/HISTORY.rc"
+    if grep -q "05x0625" <<< "${runPath}"; then
+        sed_ie "${SED_HISTORY_RC_N}" "${runPath}/HISTORY.rc"
     fi
 
     # Other text replacements
     sed_ie "${SED_HISTORY_RC_1}" "${runPath}/HISTORY.rc"
-    sed_ie "${SED_HISTORY_RC_2}" "${runPath}/HISTORY.rc"
 }
 
 
@@ -292,11 +304,11 @@ function create_rundir() {
     # Now concatenate the temporary log into the log file
     # (Or create the log file if it doesn't yet exist)
     if [[ -f "${log}" ]]; then
-	cat "${log}" "${logTmp}" >> "${logTmp2}"
-	mv -f "${logTmp2}" "${log}"
-	rm -f "${logTmp}"
+        cat "${log}" "${logTmp}" >> "${logTmp2}"
+        mv -f "${logTmp2}" "${log}"
+        rm -f "${logTmp}"
     else
-	mv "${logTmp}" "${log}"
+        mv "${logTmp}" "${log}"
     fi
 
     # Change start & end dates etc. in rundir configuration files
@@ -306,7 +318,7 @@ function create_rundir() {
     # GCHP-specific rundir configuration files etc.
     expr=$(is_gchp_rundir "${runPath}")
     if [[ "x${expr}" == "xTRUE" ]]; then
-	update_gchp_config_files "${runPath}"
+        update_gchp_config_files "${runPath}"
     fi
 
     # Remove temporary logs
@@ -323,28 +335,28 @@ function cleanup_files() {
     itRoot="${1}"
     if [[ "x${itRoot}" != "x" ]]; then
 
-	# Exit if directory is already empty
-	if [[ ! $(ls -A "${itRoot}") ]]; then
-	    echo "${itRoot} is empty... nothing to clean up!"
-	    return 0
-	fi
+    # Exit if directory is already empty
+    if [[ ! $(ls -A "${itRoot}") ]]; then
+        echo "${itRoot} is empty... nothing to clean up!"
+        return 0
+    fi
 
-	# Give user a chance to avoid removing files
-	printf "\nRemoving files and directories in ${itRoot}:\n"
-	printf "If this is OK, type 'yes to proceed or 'no' to quit:\n"
-	read answer
-	if [[ ! "${answer}" =~ [Yy][Ee][Ss] ]]; then
-	    printf "Exiting...\n"
-	    exit 1
-	fi
+    # Give user a chance to avoid removing files
+    printf "\nRemoving files and directories in ${itRoot}:\n"
+    printf "If this is OK, type 'yes to proceed or 'no' to quit:\n"
+    read answer
+    if [[ ! "${answer}" =~ [Yy][Ee][Ss] ]]; then
+        printf "Exiting...\n"
+        exit 1
+    fi
 
-	# Remove files and unlink links
-	printf "Removing ...\n"
-	for entry in ${itRoot}/*; do
-	    printf " ... ${entry}\n";
-	    [[ -L ${entry} ]] && unlink ${entry}
-	    [[ -e ${entry} ]] && rm -rf ${entry}
-	done
+    # Remove files and unlink links
+    printf "Removing ...\n"
+    for entry in ${itRoot}/*; do
+        printf " ... ${entry}\n";
+        [[ -L ${entry} ]] && unlink ${entry}
+        [[ -e ${entry} ]] && rm -rf ${entry}
+    done
     fi
 }
 
@@ -380,19 +392,19 @@ function exe_name() {
 
     # Append a suffix to the executable file name for specific directories
     if [[ "x${model}" == "xgcclassic" ]]; then
-	for suffix in ${EXE_GCC_BUILD_LIST[@]}; do
-	    if [[ "${buildDir}" =~ "${suffix}" ]]; then
-		exeFileName+=".${suffix}"
-		break
-	    fi
-	done
+    for suffix in ${EXE_GCC_BUILD_LIST[@]}; do
+        if [[ "${buildDir}" =~ "${suffix}" ]]; then
+        exeFileName+=".${suffix}"
+        break
+        fi
+    done
     elif [[ "x${model}" == "xgchp" ]]; then
-	for suffix in ${EXE_GCHP_BUILD_LIST[@]}; do
-	    if [[ "${buildDir}" =~ "${suffix}" ]]; then
-		exeFileName+=".${suffix}"
-		break
-	    fi
-	done
+    for suffix in ${EXE_GCHP_BUILD_LIST[@]}; do
+        if [[ "${buildDir}" =~ "${suffix}" ]]; then
+        exeFileName+=".${suffix}"
+        break
+        fi
+    done
     fi
 
     # Turn off case-insensitivity
@@ -425,21 +437,21 @@ function config_options() {
 
     # Pick the proper build options
     if [[ ${dir} =~ "apm" ]]; then
-	options="${baseOptions} -DAPM=y -DEXE_FILE_NAME=${exeFileName}"
+        options="${baseOptions} -DAPM=y -DEXE_FILE_NAME=${exeFileName}"
     elif [[ ${dir} =~ "carbon" ]]; then
-	options="${baseOptions} -DMECH=carbon -DEXE_FILE_NAME=${exeFileName}"
+        options="${baseOptions} -DMECH=carbon -DEXE_FILE_NAME=${exeFileName}"
     elif [[ ${dir} =~ "hg" ]]; then
-	options="${baseOptions} -DMECH=Hg -DEXE_FILE_NAME=${exeFileName}"
+        options="${baseOptions} -DMECH=Hg -DEXE_FILE_NAME=${exeFileName}"
     elif [[ ${dir} =~ "luowd" ]]; then
-	options="${baseOptions} -DLUO_WETDEP=y -DEXE_FILE_NAME=${exeFileName}"
+        options="${baseOptions} -DLUO_WETDEP=y -DEXE_FILE_NAME=${exeFileName}"
     elif [[ ${dir} =~ "rrtmg" ]]; then
-	options="${baseOptions} -DRRTMG=y -DEXE_FILE_NAME=${exeFileName}"
+        options="${baseOptions} -DRRTMG=y -DEXE_FILE_NAME=${exeFileName}"
     elif [[ ${dir} =~ "tomas15" ]]; then
-	options="${baseOptions} -DTOMAS=y -DTOMAS_BINS=15 -DBPCH_DIAG=y -DEXE_FILE_NAME=${exeFileName}"
+        options="${baseOptions} -DTOMAS=y -DTOMAS_BINS=15 -DBPCH_DIAG=y -DEXE_FILE_NAME=${exeFileName}"
     elif [[ ${dir} =~ "tomas40" ]]; then
-	options="${baseOptions} -DTOMAS=y -DTOMAS_BINS=40 -DBPCH_DIAG=y -DEXE_FILE_NAME=${exeFileName}"
+        options="${baseOptions} -DTOMAS=y -DTOMAS_BINS=40 -DBPCH_DIAG=y -DEXE_FILE_NAME=${exeFileName}"
     else
-	options="${baseOptions}"
+        options="${baseOptions}"
     fi
 
     # Turn off case-insensitivity
@@ -469,21 +481,21 @@ function compiletest_name() {
 
     # Pick the proper build options
     if [[ "${buildDir}" =~ "apm" ]]; then
-	result="${displayName} with APM"
+        result="${displayName} with APM"
     elif [[ "${buildDir}" =~ "carbon" ]]; then
-	result="${displayName} w/ carbon gases (as a KPP mechanism)"
+        result="${displayName} w/ carbon gases (as a KPP mechanism)"
     elif [[ "${buildDir}" =~ "luowd" ]]; then
-	result="${displayName} with Luo et al wetdep"
+        result="${displayName} with Luo et al wetdep"
     elif [[ "${buildDir}" =~ "hg" ]]; then
-	result="${displayName} with Hg (as a KPP mechanism)"
+        result="${displayName} with Hg (as a KPP mechanism)"
     elif [[ "${buildDir}" =~ "rrtmg" ]]; then
-	result="${displayName} with RRTMG"
+        result="${displayName} with RRTMG"
     elif [[ "${buildDir}" =~ "tomas15" ]]; then
-	result="${displayName} with TOMAS15"
+        result="${displayName} with TOMAS15"
     elif [[ "${buildDir}" =~ "tomas40" ]]; then
-	result="${displayName} with TOMAS40"
+        result="${displayName} with TOMAS40"
     else
-	result="${displayName}"
+        result="${displayName}"
     fi
 
     # Turn off case-insensitivity
@@ -517,9 +529,9 @@ function build_model() {
 
     # Stop with error if the model name is invalid
     if [[ "x${model}" != "xgcclassic" && "x${model}" != "xgchp" ]]; then
-	echo "ERROR: '${model}' is an invalid model name!"
-	echo "Exiting in 'build_model' (in 'commonFunctionsForTests.sh')"
-	exit 1
+        echo "ERROR: '${model}' is an invalid model name!"
+        echo "Exiting in 'build_model' (in 'commonFunctionsForTests.sh')"
+        exit 1
     fi
 
     # Local variables
@@ -539,10 +551,10 @@ function build_model() {
     # it as a single string rather than individual options.
     cmake "${codeDir}" ${configOptions} >> "${log}" 2>&1
     if [[ $? -ne 0 ]]; then
-	if [[ "x${results}" != "x" ]]; then
-	    print_to_log "${failMsg}" "${results}"
-	fi
-	return 1
+        if [[ "x${results}" != "x" ]]; then
+            print_to_log "${failMsg}" "${results}"
+        fi
+        return 1
     fi
 
     #----------------------------------------
@@ -550,10 +562,10 @@ function build_model() {
     #----------------------------------------
     make -j install >> "${log}" 2>&1
     if [[ $? -ne 0 ]]; then
-	if [[ "x${results}" != "x" ]]; then
-	    print_to_log "${failMsg}" "${results}"
-	fi
-	return 1
+        if [[ "x${results}" != "x" ]]; then
+            print_to_log "${failMsg}" "${results}"
+        fi
+        return 1
     fi
 
     #----------------------------------------
@@ -577,11 +589,11 @@ function rename_end_restart_file() {
 
     # Rename the ending restart file
     for r in Restarts/*.nc4; do
-	if [[ "${r}" =~ "${END_hhmm_1h}" || "${r}" =~ "${END_hhmm_20m}" ]]; then
-	    newRstFile="${r}.${suffix}"
-	    mv -f "${r}" "${newRstFile}"
-	    [[ -f "${newRstFile}" ]] && return 0
-	fi
+        if [[ "${r}" =~ "${END_hhmm_1h}" || "${r}" =~ "${END_hhmm_20m}" ]]; then
+            newRstFile="${r}.${suffix}"
+            mv -f "${r}" "${newRstFile}"
+            [[ -f "${newRstFile}" ]] && return 0
+        fi
     done
     return 1
 }
@@ -607,4 +619,124 @@ function score_parallelization_test() {
     # If the files are bitwise identical then the parallel test is successful
     diff "$rstFile1" "$rstFile2"
     return $?
+}
+
+
+function print_bootstrap_info_message() {
+    #========================================================================
+    # Prints a message to indicate if species bootstrapping is enabled.
+    #
+    # 1st argument: Enable ("yes") or disable ("no") bootstrapping
+    #========================================================================
+    if [[ "x${1}" == "xyes" ]]; then
+        echo ""
+        echo "%%%%% Species not found in the restart file will   %%%%%"
+        echo "%%%%% be bootstrapped (i.e. set to default values) %%%%%"
+    else
+        echo ""
+        echo "%%%%% Integration tests will fail unless all %%%%%"
+        echo "%%%%% species are found in the restart file! %%%%%"
+    fi
+}
+
+
+function change_time_cycle_flags() {
+    #========================================================================
+    # Changes the HEMCO time cycle flag for a given HEMCO container.
+    #
+    # 1st argument = HEMCO configuration file
+    # 2nd argument = HEMCO container
+    # 3rd argument = Old time cycle flag
+    # 4th argument = New time cycle flag
+    #========================================================================
+    hcoCfg="${1}"
+    hcoCont="${2}"
+    oldFlag="${3}"
+    newFlag="${4}"
+
+    # Search for the container in HEMCO configuration file
+    # The set -f prevents * from being expanded to a file listing
+    set -f
+    text=$(grep "${hcoCont}" "${hcoCfg}")
+    unset -f
+
+    # Replace the time cycle flag for the container
+    if [[ "x${text}" != "x" ]]; then
+	sedCmd=$(sed_string "${text}" "${oldFlag}" "${newFlag}")
+	sed_ie "${sedCmd}" "${hcoCfg}"
+    fi
+}
+
+
+function gcc_enable_or_disable_bootstrap() {
+    #========================================================================
+    # Edits HEMCO_Config.rc files to enable or disable "bootstrapping",
+    # which is setting missing restart file variables to default values.
+    #
+    # 1st argument: Enable ("yes") or disable ("no") bootstrapping
+    # 2nd argument: Directory containing integration test rundirs
+    #========================================================================
+    bootStrap="${1}"
+    rundirsDir="${2}"
+
+    print_bootstrap_info_message "${bootStrap}"
+
+    # Loop over rundirs
+    for runDir in ${rundirsDir}/*; do
+
+        # Do the following if for only valid GEOS-Chem run dirs
+        expr=$(is_valid_rundir "${runDir}")
+        if [[ "x${expr}" == "xTRUE" ]]; then
+
+            # Specify path HEMCO_Config.rc
+            hcoCfg="${runDir}/HEMCO_Config.rc"
+
+            if [[ "x${bootStrap}" == "xyes" ]]; then
+		# Set missing species in restarts & BC files to defaults
+		change_time_cycle_flags "${hcoCfg}" "SPC_ " "EFYO" "CYS"
+		change_time_cycle_flags "${hcoCfg}" "SPC_ " "EY"   "CYS"
+		change_time_cycle_flags "${hcoCfg}" "BC_ "  "EFY"  "CYS"
+            else
+		# Halt run if species are missing from restarts & BC files
+		change_time_cycle_flags "${hcoCfg}" "SPC_ " "CYS"  "EFYO"
+		change_time_cycle_flags "${hcoCfg}" "SPC_ " "EY"   "EFYO"
+		change_time_cycle_flags "${hcoCfg}" "BC_ "  "CYS"  "EFY"
+            fi
+        fi
+    done
+}
+
+
+function gchp_enable_or_disable_bootstrap() {
+    #========================================================================
+    # Edits HEMCO_Config.rc files to enable or disable "bootstrapping",
+    # which is setting missing restart file variables to default values.
+    #
+    # 1st argument: Enable ("yes") or disable ("no") bootstrapping
+    # 2nd argument: Directory containing integration test rundirs
+    #========================================================================
+    bootStrap="${1}"
+    rundirsDir="${2}"
+
+    print_bootstrap_info_message "${bootStrap}"
+
+    # Loop over rundirs
+    for runDir in ${rundirsDir}/*; do
+
+        # Do the following if for only valid GEOS-Chem run dirs
+        expr=$(is_gchp_rundir "${runDir}")
+        if [[ "x${expr}" == "xTRUE" ]]; then
+
+            # Specify path HEMCO_Config.rc
+            script="${runDir}/setCommonRunSettings.sh"
+
+            if [[ "x${bootStrap}" == "xyes" ]]; then
+                # Set missing restart file variables to defaults
+                sed_ie "s/Require_Species_in_Restart=./Require_Species_in_Restart=0/" "${script}"
+            else
+                # Don't set missing restart file variables to defaults
+                sed_ie "s/Require_Species_in_Restart=./Require_Species_in_Restart=1/" "${script}"
+            fi
+        fi
+    done
 }
