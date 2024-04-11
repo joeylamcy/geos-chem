@@ -1410,15 +1410,15 @@
       ! ! Pressure [Pa]
       ! PRESSURE      = State_Met%SLP( I,J ) * 1.e+2_fp
       ! CO2 mole fraction [mol/mol]
-      ! CO2           = State_Chm%Species( I,J,1,id_CO2 ) * AIRMW &
-      !               / State_Chm%SpcData( id_CO2 )%Info%MW_g
+      ! CO2           = State_Chm%Species(id_CO2)%Conc( I,J,1 ) * AIRMW &
+      !               / State_Chm%SpcData(id_CO2)%Info%MW_g
       CO2           = Input_Opt%Ecophy_CO2 * 1.e-6_fp
       ! O2 mole fraction [mol/mol]
-      O2            = State_Chm%Species( I,J,1,id_O2  ) * AIRMW &
-                    / State_Chm%SpcData( id_O2  )%Info%MW_g
+      O2            = State_Chm%Species(id_O2)%Conc( I,J,1 ) * AIRMW &
+                    / State_Chm%SpcData(id_O2)%Info%MW_g
       ! O3 mole fraction [mol/mol]
-      O3            = State_Chm%Species( I,J,1,id_O3  ) * AIRMW &
-                    / State_Chm%SpcData( id_O3  )%Info%MW_g
+      O3            = State_Chm%Species(id_O3)%Conc( I,J,1 ) * AIRMW &
+                    / State_Chm%SpcData(id_O3)%Info%MW_g
       ! LAI [m^2 m^-2]
       LAI           = State_Met%XLAI( I,J,LDT )
       ! Root zone soil wetness

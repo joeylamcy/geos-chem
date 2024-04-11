@@ -3812,6 +3812,7 @@ CONTAINS
        CALL GC_CheckVar( 'State_Chm%NOXLAT', 2, RC )
        IF ( RC /= GC_SUCCESS ) RETURN
        State_Chm%NOXLAT => NULL()
+    ENDIF
 
     IF ( ASSOCIATED( State_Chm%Isop_from_Ecophy ) ) THEN
        DEALLOCATE( State_Chm%Isop_from_Ecophy, STAT=RC )
